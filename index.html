@@ -1,0 +1,198 @@
+<html>
+<head>
+<meta charset="utf-8">
+<title>Generic javascript-eval unpacker</title>
+<style type="text/css">
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 62.5%;
+}
+body {
+  font-family: "Lucida Grande", "Lucida Sans Unicode", Verdana, Arial, Helvetica, sans-serif;
+  font-size: 14px; font-size: 1.4rem;
+  line-height: 150%;
+}
+textarea, input {
+  font-family: "Droid Mono", "Monaco", "Lucida Console", "Courier New", monospace;
+}
+h1, button {
+  font-family: "Lucida Grande", "Lucida Sans Unicode", Verdana, Arial, Helvetica, sans-serif;
+  font-size: 24px; font-size: 2.4rem;
+}
+
+body {
+    background-color: #f4f4f4;
+}
+
+button {
+    line-height: 150%;
+    cursor: pointer;
+}
+
+textarea, button {
+    width: 100%;
+}
+.source-input {
+    display: block;
+    border: 1px solid #ccc;
+    height: 50%;
+    margin-top: 14px;
+    margin-bottom: 14px;
+    padding: 7px;
+    background-color: #ffe;
+}
+
+.unpacker-plate {
+    margin: 20px 40px;
+    border-radius: 10px;
+    border: 1px solid #aaa;
+    background-color: white;
+    padding: 20px;
+    box-shadow: 0 4px 10px 0 #ccc;
+}
+
+.message {
+    padding-top: 14px;
+    color: #933;
+}
+
+
+.submit {
+    margin-top: 7px;
+}
+.unpacker-form {
+    margin-bottom: 14px;
+}
+.footer {
+    color: #888;
+}
+.footer a {
+    color: #555;
+}
+.js-success { display: none; color: #393 }
+.js-failed { display: none; color: #933 }
+.js-failed-exception { display: none; color: #933 }
+
+</style>
+</head>
+
+<body>
+
+<div class="unpacker-plate">
+<p>This is a boring, generic eval-based unpacker.</p>
+<p>Paste the source inside the textarea.</p>
+
+<p class="js-success">It looks like the script unpacked.</p>
+<p class="js-failed-exception">Unpacking script threw some exception.</p>
+<p class="js-failed">Unpacking failed.</p>
+
+<form class="unpacker-form" method="post" action="?">
+<textarea spellcheck="false" name="packed_source" class="source-input js-source-input" autoFocus></textarea>
+
+<label><input type="checkbox" name="allow_eval" class="js-allow-eval" > Actually run the eval code?</label>
+<button class="submit js-submit" type="submit">Unpack</button>
+</form>
+
+<p class="footer">Written by Einar Lielmanis, einars@spicausis.lv.</p>
+</div>
+
+<script>
+
+(function () {
+
+    const elem = (class_name) => {
+        const elts = document.getElementsByClassName(class_name)
+        return elts[0]
+    }
+
+    const source_input = elem('js-source-input')
+
+    const old = {
+        eval: eval,
+        doc_write: document.write,
+        doc_writeln: document.writeln,
+    }
+
+    let caught = false
+    let eval_times = 0
+    let result = []
+    let allow_eval = false
+
+    const log = (source, data) => {
+        result.push(`// ${source}\n${data}\n`)
+        console.log({ data })
+    }
+
+
+    const setup = () => {
+        allow_eval = elem('js-allow-eval').checked
+        caught = false
+        eval_times = 0
+        old.eval = eval
+        result = []
+
+        old.doc_write = document.write
+        old.doc_writeln = document.writeln
+
+        document.write = (s) => log('document.write', s)
+        document.writeln = (s) => log('document.writeln', s)
+        eval = my_eval
+
+    }
+
+    const teardown = () => {
+        eval = old.eval
+        document.write = old.doc_write
+        document.writeln = old.doc_writeln
+    }
+
+
+    const my_eval = (js) => {
+        caught = true
+        log('eval', js)
+        if (allow_eval) {
+            return old.eval(js)
+        }
+    }
+
+    elem('js-submit').onclick = function (ev) {
+
+        ev.preventDefault()
+
+        if (source_input.value) {
+            caught = false
+            elem('js-failed').style.display = 'none'
+            elem('js-failed-exception').style.display = 'none'
+            elem('js-success').style.display = 'none'
+
+            setup()
+            try {
+                old.eval( source_input.value )
+            } catch (e) {
+                console.log(e)
+                elem('js-failed-exception').style.display = 'block'
+            }
+            teardown()
+
+            if (caught) {
+                source_input.value = result.join("\n")
+                elem('js-success').style.display = 'block'
+            } else {
+                elem('js-failed').style.display = 'block'
+            }
+        }
+
+    }
+
+})()
+
+</script>
+</body>
+</html>
+
+
